@@ -11,15 +11,21 @@ import {
   Alert,
   IconButton,
   Divider,
-  Chip
+  Chip,
+  FormControl,
+  Select,
+  MenuItem,
+  Tooltip
 } from '@mui/material';
 import {
   Close,
   MenuBook,
   Schedule,
-  CheckCircle
+  CheckCircle,
+  Translate,
+  Language
 } from '@mui/icons-material';
-import { Lesson } from '../types';
+import { Lesson, TranslationState, TranslationResponse } from '../types';
 import axios from 'axios';
 
 interface LessonModalProps {
@@ -31,8 +37,29 @@ interface LessonModalProps {
 
 export default function LessonModal({ open, onClose, lesson, courseId }: LessonModalProps) {
   const [lessonContent, setLessonContent] = useState<string>('');
+  const [originalContent, setOriginalContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Translation state
+  const [translationState, setTranslationState] = useState<TranslationState>({
+    isTranslated: false,
+    currentLanguage: 'en',
+    targetLanguage: 'ta',
+    isLoading: false,
+    error: null
+  });
+  
+  const [availableLanguages] = useState([
+    { code: 'en', name: 'English' },
+    { code: 'ta', name: 'Tamil' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ja', name: 'Japanese' }
+  ]);
 
   useEffect(() => {
     if (open && lesson) {
@@ -46,6 +73,7 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
     setLoading(true);
     setError(null);
     setLessonContent('');
+    setOriginalContent('');
 
     try {
       const response = await axios.post('http://localhost:5000/lesson-content', {
@@ -54,7 +82,17 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
         course_id: courseId
       });
 
-      setLessonContent(response.data.content);
+      const content = response.data.content;
+      setLessonContent(content);
+      setOriginalContent(content);
+      
+      // Reset translation state
+      setTranslationState(prev => ({
+        ...prev,
+        isTranslated: false,
+        currentLanguage: 'en',
+        error: null
+      }));
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const errorMessage = err.response?.data?.error || err.message;
@@ -68,9 +106,60 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
     }
   };
 
+  const handleTranslate = async () => {
+    if (!lessonContent || !originalContent) return;
+
+    setTranslationState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await axios.post('http://localhost:5000/translate-lesson', {
+        content: translationState.isTranslated ? originalContent : lessonContent,
+        target_lang: translationState.isTranslated ? 'en' : translationState.targetLanguage
+      });
+
+      const { translated_content, target_lang_name } = response.data;
+      
+      setLessonContent(translated_content);
+      setTranslationState(prev => ({
+        ...prev,
+        isTranslated: !prev.isTranslated,
+        currentLanguage: prev.isTranslated ? 'en' : prev.targetLanguage,
+        isLoading: false,
+        error: null
+      }));
+    } catch (err) {
+      const errorMessage = axios.isAxiosError(err) 
+        ? err.response?.data?.error || err.message
+        : 'Translation failed. Please try again.';
+      
+      setTranslationState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage
+      }));
+      console.error('Translation error:', err);
+    }
+  };
+
+  const handleLanguageChange = (event: any) => {
+    const newTargetLang = event.target.value;
+    setTranslationState(prev => ({
+      ...prev,
+      targetLanguage: newTargetLang
+    }));
+  };
+
   const handleClose = () => {
     setLessonContent('');
+    setOriginalContent('');
     setError(null);
+    setTranslationState({
+      isTranslated: false,
+      currentLanguage: 'en',
+      targetLanguage: 'ta',
+      isLoading: false,
+      error: null
+    });
     onClose();
   };
 
@@ -102,17 +191,57 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
           </Typography>
         </Box>
         
-        <IconButton
-          onClick={handleClose}
-          sx={{ 
-            color: 'text.secondary',
-            '&:hover': {
-              backgroundColor: 'action.hover'
-            }
-          }}
-        >
-          <Close />
-        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Translation Controls */}
+          {lessonContent && !loading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <Select
+                  value={translationState.targetLanguage}
+                  onChange={handleLanguageChange}
+                  disabled={translationState.isLoading}
+                  sx={{ fontSize: '0.875rem' }}
+                >
+                  {availableLanguages.map((lang) => (
+                    <MenuItem key={lang.code} value={lang.code}>
+                      {lang.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              <Tooltip title={translationState.isTranslated ? "Switch to English" : `Translate to ${availableLanguages.find(l => l.code === translationState.targetLanguage)?.name}`}>
+                <Button
+                  variant={translationState.isTranslated ? "contained" : "outlined"}
+                  size="small"
+                  onClick={handleTranslate}
+                  disabled={translationState.isLoading || !lessonContent}
+                  startIcon={translationState.isLoading ? <CircularProgress size={16} /> : <Translate />}
+                  sx={{ 
+                    minWidth: 'auto',
+                    px: 2,
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {translationState.isLoading ? 'Translating...' : 
+                   translationState.isTranslated ? 'English' : 'Translate'}
+                </Button>
+              </Tooltip>
+            </Box>
+          )}
+          
+          <IconButton
+            onClick={handleClose}
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': {
+                backgroundColor: 'action.hover'
+              }
+            }}
+          >
+            <Close />
+          </IconButton>
+        </Box>
       </DialogTitle>
 
       <Divider />
@@ -139,6 +268,18 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
               variant="outlined"
               color="success"
             />
+            {lessonContent && (
+              <Chip
+                icon={<Language />}
+                label={translationState.isTranslated 
+                  ? availableLanguages.find(l => l.code === translationState.currentLanguage)?.name || 'Translated'
+                  : 'English'
+                }
+                size="small"
+                variant="outlined"
+                color={translationState.isTranslated ? "secondary" : "default"}
+              />
+            )}
           </Box>
         </Box>
 
@@ -164,6 +305,12 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
+            </Alert>
+          )}
+
+          {translationState.error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Translation Error: {translationState.error}
             </Alert>
           )}
 

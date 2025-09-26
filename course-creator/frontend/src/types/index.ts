@@ -57,3 +57,18 @@ export interface CourseStepProps {
   courseData: CourseData;
   setCourseData: (data: CourseData) => void;
 }
+
+export interface TranslationState {
+  isTranslated: boolean;
+  currentLanguage: string;
+  targetLanguage: string;
+  isLoading: boolean;
+  error: string | null;
+}
+
+export interface TranslationResponse {
+  original_content: string;
+  translated_content: string;
+  target_lang: string;
+  target_lang_name: string;
+}

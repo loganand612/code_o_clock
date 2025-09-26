@@ -10,6 +10,7 @@ from content_ingestion import (
 from text_preprocessing import clean_and_chunk_text
 from ai_providers import ai_manager
 from chroma_storage import ChromaDocumentStore
+from translation_service import translation_service
 
 app = Flask(__name__)
 CORS(app)
@@ -204,6 +205,83 @@ def get_all_content():
         return jsonify(all_content)
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve content: {str(e)}"}), 500
+
+@app.route('/translate', methods=['POST'])
+def translate_content():
+    """
+    Translate text content to target language
+    """
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        target_lang = data.get('target_lang', 'ta')  # Default to Tamil
+        source_lang = data.get('source_lang', 'auto')
+        
+        if not text:
+            return jsonify({"error": "Text is required"}), 400
+        
+        # Translate the text
+        translated_text = translation_service.translate_text(text, source_lang, target_lang)
+        
+        return jsonify({
+            "original_text": text,
+            "translated_text": translated_text,
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+            "target_lang_name": translation_service.get_language_name(target_lang)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Translation failed: {str(e)}"}), 500
+
+@app.route('/translate-lesson', methods=['POST'])
+def translate_lesson():
+    """
+    Translate lesson content preserving formatting
+    """
+    try:
+        data = request.get_json()
+        content = data.get('content', '')
+        target_lang = data.get('target_lang', 'ta')  # Default to Tamil
+        
+        if not content:
+            return jsonify({"error": "Content is required"}), 400
+        
+        # Translate lesson content
+        translated_content = translation_service.translate_lesson_content(content, target_lang)
+        
+        return jsonify({
+            "original_content": content,
+            "translated_content": translated_content,
+            "target_lang": target_lang,
+            "target_lang_name": translation_service.get_language_name(target_lang)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Lesson translation failed: {str(e)}"}), 500
+
+@app.route('/languages', methods=['GET'])
+def get_supported_languages():
+    """
+    Get list of supported languages for translation
+    """
+    try:
+        languages = translation_service.get_supported_languages()
+        return jsonify({
+            "languages": languages,
+            "default_languages": {
+                "en": "English",
+                "ta": "Tamil",
+                "hi": "Hindi",
+                "es": "Spanish",
+                "fr": "French",
+                "de": "German",
+                "zh": "Chinese",
+                "ja": "Japanese"
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get languages: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

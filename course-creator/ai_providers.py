@@ -9,6 +9,10 @@ import requests
 import time
 from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class AIProvider(ABC):
     """Abstract base class for AI providers"""
@@ -371,6 +375,7 @@ class AIProviderManager:
     """Manager class to handle multiple AI providers with fallback"""
     
     def __init__(self):
+        # Prioritize Groq as the primary provider
         self.providers = [
             GroqProvider(),
             GeminiProvider()
@@ -379,7 +384,20 @@ class AIProviderManager:
         self._select_provider()
     
     def _select_provider(self):
-        """Select the best available provider"""
+        """Select the best available provider, prioritizing Groq"""
+        # First, try to find Groq specifically
+        groq_provider = None
+        for provider in self.providers:
+            if isinstance(provider, GroqProvider) and provider.is_available():
+                groq_provider = provider
+                break
+        
+        if groq_provider:
+            self.current_provider = groq_provider
+            print(f"Selected AI provider: {groq_provider.__class__.__name__}")
+            return
+        
+        # If Groq is not available, try other providers
         for provider in self.providers:
             if provider.is_available():
                 self.current_provider = provider
@@ -389,9 +407,26 @@ class AIProviderManager:
         raise Exception("No AI providers available. Please configure at least one provider.")
     
     def generate_course(self, text_chunks: List[str], user_prompt: str) -> Dict[str, Any]:
-        """Generate course with fallback support"""
+        """Generate course with fallback support, prioritizing Groq"""
+        # First try Groq specifically
+        groq_provider = None
         for provider in self.providers:
-            if provider.is_available():
+            if isinstance(provider, GroqProvider) and provider.is_available():
+                groq_provider = provider
+                break
+        
+        if groq_provider:
+            try:
+                print(f"Attempting course generation with {groq_provider.__class__.__name__}")
+                result = groq_provider.generate_course(text_chunks, user_prompt)
+                self.current_provider = groq_provider
+                return result
+            except Exception as e:
+                print(f"Failed with {groq_provider.__class__.__name__}: {str(e)}")
+        
+        # If Groq fails, try other providers
+        for provider in self.providers:
+            if provider.is_available() and not isinstance(provider, GroqProvider):
                 try:
                     print(f"Attempting course generation with {provider.__class__.__name__}")
                     result = provider.generate_course(text_chunks, user_prompt)
@@ -404,9 +439,26 @@ class AIProviderManager:
         raise Exception("All AI providers failed. Please check your configuration.")
     
     def generate_lesson_content(self, lesson_title: str, lesson_summary: str, context_chunks: List[str]) -> str:
-        """Generate lesson content with fallback support"""
+        """Generate lesson content with fallback support, prioritizing Groq"""
+        # First try Groq specifically
+        groq_provider = None
         for provider in self.providers:
-            if provider.is_available():
+            if isinstance(provider, GroqProvider) and provider.is_available():
+                groq_provider = provider
+                break
+        
+        if groq_provider:
+            try:
+                print(f"Attempting lesson generation with {groq_provider.__class__.__name__}")
+                result = groq_provider.generate_lesson_content(lesson_title, lesson_summary, context_chunks)
+                self.current_provider = groq_provider
+                return result
+            except Exception as e:
+                print(f"Failed with {groq_provider.__class__.__name__}: {str(e)}")
+        
+        # If Groq fails, try other providers
+        for provider in self.providers:
+            if provider.is_available() and not isinstance(provider, GroqProvider):
                 try:
                     print(f"Attempting lesson generation with {provider.__class__.__name__}")
                     result = provider.generate_lesson_content(lesson_title, lesson_summary, context_chunks)
