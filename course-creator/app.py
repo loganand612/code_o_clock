@@ -8,7 +8,7 @@ from content_ingestion import (
     extract_text_from_website,
 )
 from text_preprocessing import clean_and_chunk_text
-from llm_processor import generate_course_from_text
+from ai_providers import ai_manager
 from chroma_storage import ChromaDocumentStore
 
 app = Flask(__name__)
@@ -82,23 +82,13 @@ def upload_content():
             # Store chunks in ChromaDB
             course_id = document_store.store_course_content(chunks, source_info)
             
-            # For testing: Skip LLM generation and return dummy course structure
-            dummy_course = {
-                "course": "Test Course",
-                "modules": [{
-                    "title": "Test Module",
-                    "lessons": [{
-                        "title": "Test Lesson",
-                        "summary": "Test summary of extracted content",
-                        "detail": text[:500] if len(text) > 500 else text  # First 500 chars of extracted text
-                    }]
-                }]
-            }
+            # Generate course using AI manager with fallback
+            generated_course = ai_manager.generate_course(chunks, user_prompt)
             
             response_data = {
                 "course_id": course_id,
                 "extracted_text": text,
-                "course": dummy_course
+                "course": generated_course
             }
             return jsonify(response_data)
         except Exception as e:
@@ -113,6 +103,68 @@ def search_content():
     """
     Search for relevant content in stored courses
     """
+    try:
+        data = request.get_json()
+        query = data.get('query', '')
+        course_id = data.get('course_id', '')
+        n_results = data.get('n_results', 5)
+        
+        if not query:
+            return jsonify({"error": "Query is required"}), 400
+        
+        # Search in ChromaDB
+        results = document_store.search_content(query, n_results)
+        
+        return jsonify({
+            "results": results,
+            "query": query
+        })
+    except Exception as e:
+        return jsonify({"error": f"Search failed: {str(e)}"}), 500
+
+@app.route('/lesson-content', methods=['POST'])
+def get_lesson_content():
+    """
+    Get detailed lesson content using RAG from ChromaDB
+    """
+    try:
+        data = request.get_json()
+        lesson_title = data.get('lesson_title', '')
+        lesson_summary = data.get('lesson_summary', '')
+        course_id = data.get('course_id', '')
+        
+        if not lesson_title:
+            return jsonify({"error": "Lesson title is required"}), 400
+        
+        # Create a comprehensive query for RAG
+        query = f"{lesson_title} {lesson_summary}"
+        
+        # Search for relevant content
+        search_results = document_store.search_content(query, n_results=10)
+        
+        # Combine the search results into context
+        context_chunks = []
+        if search_results and 'documents' in search_results:
+            for doc_list in search_results['documents']:
+                for doc in doc_list:
+                    if doc and len(doc.strip()) > 50:  # Filter out very short chunks
+                        context_chunks.append(doc)
+        
+        # Create comprehensive lesson content using the context
+        lesson_content = ai_manager.generate_lesson_content(
+            lesson_title=lesson_title,
+            lesson_summary=lesson_summary,
+            context_chunks=context_chunks
+        )
+        
+        return jsonify({
+            "lesson_title": lesson_title,
+            "content": lesson_content,
+            "context_sources": len(context_chunks)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate lesson content: {str(e)}"}), 500
     query = request.json.get('query')
     n_results = request.json.get('n_results', 5)
     

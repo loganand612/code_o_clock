@@ -3,10 +3,11 @@ import { Stepper, Step, StepLabel, Box } from '@mui/material';
 import CourseDescription from './CourseDescription';
 import CourseUpload from './CourseUpload';
 import CourseDetails from './CourseDetails';
+import LearningPath from './LearningPath';
 import CourseOutcome from './CourseOutcome';
 import { CourseData } from '../types';
 
-const steps = ['Course', 'Upload', 'Learner', 'Outcome'];
+const steps = ['Course', 'Upload', 'Learner', 'Learning Path', 'Outcome'];
 
 export default function CourseStepper() {
   const [activeStep, setActiveStep] = useState(0);
@@ -57,6 +58,13 @@ export default function CourseStepper() {
                  setCourseData={setCourseData} 
                />;
       case 3:
+        return <LearningPath 
+                 onNext={handleNext} 
+                 onBack={handleBack}
+                 courseData={courseData} 
+                 setCourseData={setCourseData} 
+               />;
+      case 4:
         return <CourseOutcome 
                  onBack={handleBack}
                  courseData={courseData} 

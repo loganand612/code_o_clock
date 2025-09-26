@@ -10,3 +10,7 @@ langchain
 openai
 chromadb
 sentence-transformers
+google-generativeai
+transformers
+torch
+accelerate
