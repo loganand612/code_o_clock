@@ -13,6 +13,7 @@ export default function CourseStepper() {
   const [courseData, setCourseData] = useState<CourseData>({
     description: '',
     uploadedFiles: [],
+    urls: [],
     courseId: '',
     extractedText: '',
     generatedCourse: null,

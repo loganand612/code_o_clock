@@ -10,3 +10,8 @@ langchain
 openai
 chromadb
 sentence-transformers
+gtts
+moviepy
+Pillow
+google-generativeai
+pytube

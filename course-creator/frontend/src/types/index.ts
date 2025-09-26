@@ -45,10 +45,13 @@ export interface CourseDetails {
 export interface CourseData {
   description: string;
   uploadedFiles: File[];
+  urls: string[];
   courseId: string;
   extractedText: string;
   generatedCourse: GeneratedCourse | null;
   courseDetails: CourseDetails;
+  sourcesProcessed?: number;
+  sourceInfo?: any;
 }
 
 export interface CourseStepProps {

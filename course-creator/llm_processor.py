@@ -43,42 +43,23 @@ Your task is to take raw content and create a structured learning course.
 - Ensure output is always in valid JSON.
 """
 
+# LLM processor is disabled. This module now only passes through the summary for video generation.
+
 def generate_course_from_text(text_chunks, user_prompt):
-    # Combine the chunks into a single text for the LLM
-    full_text = "\n".join(text_chunks)
-    
-    # Combine the user's prompt, the master prompt, and the text
-    prompt = f"{user_prompt}\n\n{MASTER_PROMPT}\n\nHere is the content:\n{full_text}\n\nRemember to respond with valid JSON only."
-    
-    # Generate content using Gemini
-    response = model.generate_content(prompt)
-    
-    try:
-        # Try to extract JSON from the response
-        # First, try to parse the response directly
-        try:
-            return json.loads(response.text)
-        except json.JSONDecodeError:
-            # If direct parsing fails, try to extract JSON from the text
-            # Look for content between curly braces
-            json_text = response.text
-            start_idx = json_text.find('{')
-            end_idx = json_text.rfind('}') + 1
-            if start_idx != -1 and end_idx != -1:
-                json_text = json_text[start_idx:end_idx]
-                return json.loads(json_text)
-            else:
-                raise ValueError("Could not extract valid JSON from response")
-    except Exception as e:
-        # If JSON parsing fails, return an error structure
-        return {
-            "course": "Error in Course Generation",
-            "modules": [{
-                "title": "Error",
-                "lessons": [{
-                    "title": "Error in Processing",
-                    "summary": f"Failed to generate course content: {str(e)}",
-                    "detail": "There was an error in processing the content. Please try again with different content or check the input format."
-                }]
-            }]
-        }
+    # Instead of LLM, just return a simple course structure using the extracted text
+    summary = text_chunks[0][:200] if text_chunks else "No content available."
+    return {
+        "course": "Generated Course (No LLM)",
+        "modules": [
+            {
+                "title": "Module 1",
+                "lessons": [
+                    {
+                        "title": "Lesson 1",
+                        "summary": summary,
+                        "detail": "\n".join(text_chunks) if text_chunks else "No details available."
+                    }
+                ]
+            }
+        ]
+    }
