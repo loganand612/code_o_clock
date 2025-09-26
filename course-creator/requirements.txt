@@ -1,0 +1,12 @@
+Flask
+Flask-CORS
+PyMuPDF
+python-docx
+python-pptx
+youtube-transcript-api
+BeautifulSoup4
+requests
+langchain
+openai
+chromadb
+sentence-transformers
