@@ -11,6 +11,7 @@ from text_preprocessing import clean_and_chunk_text
 from ai_providers import ai_manager
 from chroma_storage import ChromaDocumentStore
 from translation_service import translation_service
+from quiz_generator import quiz_generator
 
 app = Flask(__name__)
 CORS(app)
@@ -282,6 +283,60 @@ def get_supported_languages():
         })
     except Exception as e:
         return jsonify({"error": f"Failed to get languages: {str(e)}"}), 500
+
+@app.route('/generate-quiz', methods=['POST'])
+def generate_quiz():
+    """
+    Generate a quiz from lesson or module content
+    """
+    try:
+        data = request.get_json()
+        content = data.get('content', '')
+        topic = data.get('topic', 'Quiz')
+        num_questions = data.get('num_questions', 5)
+        content_type = data.get('content_type', 'lesson')  # 'lesson' or 'module'
+        
+        if not content:
+            return jsonify({"error": "Content is required"}), 400
+        
+        # Generate quiz based on content type
+        if content_type == 'module':
+            # For module, content should be module data with lessons
+            quiz = quiz_generator.generate_quiz_from_module(content)
+        else:
+            # For individual lesson
+            quiz = quiz_generator.generate_quiz_from_content(content, topic, num_questions)
+        
+        return jsonify({
+            "quiz": quiz.to_dict(),
+            "topic": topic,
+            "content_type": content_type
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Quiz generation failed: {str(e)}"}), 500
+
+@app.route('/generate-module-quiz', methods=['POST'])
+def generate_module_quiz():
+    """
+    Generate a quiz from a complete module with lessons
+    """
+    try:
+        data = request.get_json()
+        module_data = data.get('module_data')
+        
+        if not module_data or not isinstance(module_data, dict):
+            return jsonify({"error": "Module data is required"}), 400
+        
+        quiz = quiz_generator.generate_quiz_from_module(module_data)
+        
+        return jsonify({
+            "quiz": quiz.to_dict(),
+            "module_title": module_data.get('title', 'Module')
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Module quiz generation failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

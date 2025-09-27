@@ -15,7 +15,9 @@ import {
   ListItemButton,
   Divider,
   CircularProgress,
-  Alert
+  Alert,
+  Dialog,
+  DialogContent
 } from '@mui/material';
 import {
   PlayArrow,
@@ -24,10 +26,13 @@ import {
   ExpandLess,
   MenuBook,
   Schedule,
-  CheckCircle
+  CheckCircle,
+  Quiz as QuizIcon
 } from '@mui/icons-material';
 import { CourseStepProps, Module, Lesson } from '../types';
 import LessonModal from './LessonModal';
+import QuizModal from './QuizModal';
+import { Quiz } from '../types/quiz';
 
 interface LearningPathProps extends CourseStepProps {}
 
@@ -36,6 +41,10 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadingLesson, setLoadingLesson] = useState<string | null>(null);
+  const [quizModalOpen, setQuizModalOpen] = useState(false);
+  const [currentQuizModule, setCurrentQuizModule] = useState<Module | null>(null);
+  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
 
   const course = courseData.generatedCourse;
 
@@ -67,6 +76,38 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
   const handleLessonClick = async (lesson: Lesson) => {
     setSelectedLesson(lesson);
     setIsModalOpen(true);
+  };
+
+  const handleQuizClick = async (module: Module) => {
+    setCurrentQuizModule(module);
+    setIsGeneratingQuiz(true);
+    setQuizModalOpen(true);
+    
+    try {
+      const response = await fetch('http://localhost:5000/generate-module-quiz', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          module_data: module
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate quiz');
+      }
+      
+      const data = await response.json();
+      setCurrentQuiz(data.quiz);
+      
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+      alert('Failed to generate quiz. Please try again.');
+      setQuizModalOpen(false);
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
   };
 
   const getModuleStatus = (moduleIndex: number) => {
@@ -146,6 +187,24 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
                           size="small"
                           icon={status === 'active' ? <PlayArrow /> : status === 'unlocked' ? <CheckCircle /> : <Lock />}
                         />
+                        
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<QuizIcon />}
+                          onClick={() => handleQuizClick(module)}
+                          disabled={!isUnlocked || isGeneratingQuiz}
+                          sx={{
+                            borderColor: isUnlocked ? 'primary.main' : 'grey.400',
+                            color: isUnlocked ? 'primary.main' : 'grey.400',
+                            '&:hover': {
+                              borderColor: isUnlocked ? 'primary.dark' : 'grey.400',
+                              backgroundColor: isUnlocked ? 'primary.light' : 'transparent'
+                            }
+                          }}
+                        >
+                          Quiz
+                        </Button>
                         
                         <IconButton
                           onClick={() => toggleModule(moduleIndex)}
@@ -302,6 +361,28 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
         lesson={selectedLesson}
         courseId={courseData.courseId}
       />
+      
+      <QuizModal
+        open={quizModalOpen && !isGeneratingQuiz && currentQuiz !== null}
+        onClose={() => {
+          setQuizModalOpen(false);
+          setCurrentQuizModule(null);
+          setCurrentQuiz(null);
+        }}
+        quiz={currentQuiz}
+        moduleTitle={currentQuizModule?.title || 'Module'}
+      />
+
+      {/* Loading overlay for quiz generation */}
+      <Dialog open={isGeneratingQuiz} maxWidth="sm">
+        <DialogContent sx={{ textAlign: 'center', py: 4 }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6">Generating Quiz...</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Creating personalized quiz for {currentQuizModule?.title}
+          </Typography>
+        </DialogContent>
+      </Dialog>
     </Paper>
   );
 }
