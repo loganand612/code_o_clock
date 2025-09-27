@@ -5,8 +5,11 @@ Test script to debug Flask server startup
 import os
 import sys
 
-print("Setting environment variables...")
-os.environ['GROQ_API_KEY'] = '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'
+print("Checking environment variables...")
+if 'GROQ_API_KEY' not in os.environ:
+    print("Error: GROQ_API_KEY environment variable not set")
+    print("Please set it in your .env file or environment variables")
+    sys.exit(1)
 
 print("Testing imports...")
 try:

@@ -5,8 +5,11 @@ Simple script to start the Flask server with proper environment setup
 import os
 import sys
 
-# Set the Groq API key
-os.environ['GROQ_API_KEY'] = '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'
+# Check if GROQ_API_KEY is set in environment
+if 'GROQ_API_KEY' not in os.environ:
+    print("Error: GROQ_API_KEY environment variable not set")
+    print("Please set it in your .env file or environment variables")
+    sys.exit(1)
 
 print("Environment variables set:")
 print(f"GROQ_API_KEY: {os.environ.get('GROQ_API_KEY', 'NOT SET')}")
