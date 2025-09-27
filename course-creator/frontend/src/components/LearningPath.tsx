@@ -23,11 +23,11 @@ import {
   PlayArrow,
   Lock,
   ExpandMore,
-  ExpandLess,
   MenuBook,
   Schedule,
   CheckCircle,
-  Quiz as QuizIcon
+  Quiz as QuizIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import { CourseStepProps, Module, Lesson } from '../types';
 import LessonModal from './LessonModal';
@@ -46,6 +46,8 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [completedModules, setCompletedModules] = useState<Set<number>>(new Set());
+  const [isGeneratingPPT, setIsGeneratingPPT] = useState(false);
+  const [pptGenerated, setPptGenerated] = useState(false);
 
   const course = courseData.generatedCourse;
 
@@ -83,9 +85,78 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
     }
   };
 
+  const handleDownloadPPT = async () => {
+    if (!course) return;
+    
+    setIsGeneratingPPT(true);
+    
+    try {
+      const response = await fetch('http://localhost:5000/generate-course-ppt-base64', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          course_data: course
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PPT');
+      }
+      
+      const data = await response.json();
+      
+      // Convert base64 to blob and download
+      const pptBase64 = data.ppt_base64;
+      const binaryString = atob(pptBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = data.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      
+      // Mark PPT as generated
+      setPptGenerated(true);
+      
+    } catch (error) {
+      console.error('Error downloading PPT:', error);
+      alert('Failed to download PPT. Please try again.');
+    } finally {
+      setIsGeneratingPPT(false);
+    }
+  };
+
+  const handleCompleteCourse = async () => {
+    // Generate PPT when completing course
+    await handleDownloadPPT();
+    // Then proceed to next step
+    if (onNext) {
+      onNext();
+    }
+  };
+
   const handleLessonClick = async (lesson: Lesson) => {
     setSelectedLesson(lesson);
     setIsModalOpen(true);
+    setLoadingLesson(lesson.title);
+    // Simulate loading time for lesson content
+    setTimeout(() => {
+      setLoadingLesson(null);
+    }, 1000);
   };
 
   const handleQuizClick = async (module: Module) => {
@@ -363,13 +434,32 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
         >
           Previous
         </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={onNext}
-        >
-          Complete Course
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {pptGenerated && (
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownloadPPT}
+              sx={{
+                backgroundColor: '#4caf50',
+                '&:hover': {
+                  backgroundColor: '#45a049'
+                }
+              }}
+            >
+              Download PPT Again
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleCompleteCourse}
+            disabled={isGeneratingPPT}
+          >
+            {isGeneratingPPT ? 'Generating PPT...' : 'Complete Course'}
+          </Button>
+        </Box>
       </Box>
 
       <LessonModal
@@ -398,6 +488,17 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
           <Typography variant="h6">Generating Quiz...</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             Creating personalized quiz for {currentQuizModule?.title}
+          </Typography>
+        </DialogContent>
+      </Dialog>
+
+      {/* Loading overlay for PPT generation */}
+      <Dialog open={isGeneratingPPT} maxWidth="sm">
+        <DialogContent sx={{ textAlign: 'center', py: 4 }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6">Generating Course PPT...</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Creating comprehensive course summary presentation
           </Typography>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from content_ingestion import (
     extract_text_from_pdf,
@@ -13,6 +13,9 @@ from chroma_storage import ChromaDocumentStore
 from translation_service import translation_service
 from quiz_generator import quiz_generator
 from tts_service import tts_service
+from ppt_generator import ppt_generator
+import io
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -410,6 +413,73 @@ def get_tts_languages():
         })
     except Exception as e:
         return jsonify({"error": f"Failed to get TTS languages: {str(e)}"}), 500
+
+@app.route('/generate-course-ppt', methods=['POST'])
+def generate_course_ppt():
+    """
+    Generate a PowerPoint presentation summarizing the complete course
+    """
+    try:
+        data = request.get_json()
+        course_data = data.get('course_data')
+        
+        if not course_data or not isinstance(course_data, dict):
+            return jsonify({"error": "Course data is required"}), 400
+        
+        # Validate course structure
+        if 'course' not in course_data or 'modules' not in course_data:
+            return jsonify({"error": "Invalid course data structure"}), 400
+        
+        # Generate PowerPoint presentation
+        ppt_bytes = ppt_generator.generate_course_ppt(course_data)
+        
+        # Create a BytesIO object for the file
+        ppt_io = io.BytesIO(ppt_bytes)
+        ppt_io.seek(0)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        course_name = course_data.get('course', 'Course').replace(' ', '_')
+        filename = f"{course_name}_Summary_{timestamp}.pptx"
+        
+        # Return the file as a downloadable attachment
+        return send_file(
+            ppt_io,
+            mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        return jsonify({"error": f"PPT generation failed: {str(e)}"}), 500
+
+@app.route('/generate-course-ppt-base64', methods=['POST'])
+def generate_course_ppt_base64():
+    """
+    Generate a PowerPoint presentation and return as base64 encoded string
+    """
+    try:
+        data = request.get_json()
+        course_data = data.get('course_data')
+        
+        if not course_data or not isinstance(course_data, dict):
+            return jsonify({"error": "Course data is required"}), 400
+        
+        # Validate course structure
+        if 'course' not in course_data or 'modules' not in course_data:
+            return jsonify({"error": "Invalid course data structure"}), 400
+        
+        # Generate PowerPoint presentation as base64
+        ppt_base64 = ppt_generator.generate_ppt_base64(course_data)
+        
+        return jsonify({
+            "ppt_base64": ppt_base64,
+            "filename": f"{course_data.get('course', 'Course')}_Summary.pptx",
+            "size": len(ppt_base64)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"PPT generation failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
