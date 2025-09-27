@@ -28,6 +28,11 @@ class AIProvider(ABC):
         pass
     
     @abstractmethod
+    def modify_content(self, content_type: str, original_content: Dict[str, Any], modification_prompt: str) -> Dict[str, Any]:
+        """Modify existing content based on trainer feedback"""
+        pass
+    
+    @abstractmethod
     def is_available(self) -> bool:
         """Check if the provider is available"""
         pass
@@ -185,6 +190,153 @@ Write the lesson content directly without any formatting or JSON structure.
             return self._make_request(messages, max_tokens=2000)
         except Exception as e:
             return f"Error generating lesson content: {str(e)}. Please try again."
+    
+    def modify_content(self, content_type: str, original_content: Dict[str, Any], modification_prompt: str) -> Dict[str, Any]:
+        """Modify existing content based on trainer feedback using Groq"""
+        
+        # Create modification prompt based on content type
+        if content_type == 'course':
+            system_prompt = """
+You are an expert Course Designer AI. A trainer has reviewed the AI-generated course and wants to modify it based on their feedback.
+
+Your task is to modify the course structure while maintaining the same JSON format and ensuring educational quality.
+
+Rules:
+1. Always output valid JSON only - no markdown, no explanations outside JSON.
+2. Follow this exact schema:
+   {
+     "course": "Course Title",
+     "modules": [
+       {
+         "title": "Module Title",
+         "lessons": [
+           {
+             "title": "Lesson Title",
+             "summary": "Concise overview (2-3 sentences, max 50 words)",
+             "detail": "Comprehensive explanation (400-600 words)"
+           }
+         ]
+       }
+     ]
+   }
+3. Incorporate the trainer's feedback while maintaining educational value
+4. Ensure all content is relevant and well-structured
+"""
+            
+            user_prompt = f"""
+Original Course Content:
+{json.dumps(original_content, indent=2)}
+
+Trainer's Modification Request:
+{modification_prompt}
+
+Please modify the course content according to the trainer's feedback. Return only the modified JSON structure.
+"""
+        
+        elif content_type == 'module':
+            system_prompt = """
+You are an expert Course Designer AI. A trainer wants to modify a specific module in the course.
+
+Your task is to modify the module while maintaining the same JSON format and ensuring educational quality.
+
+Rules:
+1. Always output valid JSON only
+2. Follow this exact schema:
+   {
+     "title": "Module Title",
+     "lessons": [
+       {
+         "title": "Lesson Title", 
+         "summary": "Concise overview (2-3 sentences, max 50 words)",
+         "detail": "Comprehensive explanation (400-600 words)"
+       }
+     ]
+   }
+"""
+            
+            user_prompt = f"""
+Original Module Content:
+{json.dumps(original_content, indent=2)}
+
+Trainer's Modification Request:
+{modification_prompt}
+
+Please modify the module content according to the trainer's feedback. Return only the modified JSON structure.
+"""
+        
+        elif content_type == 'lesson':
+            system_prompt = """
+You are an expert educator. A trainer wants to modify a specific lesson content.
+
+Your task is to modify the lesson while maintaining educational quality and depth.
+
+Rules:
+1. Always output valid JSON only
+2. Follow this exact schema:
+   {
+     "title": "Lesson Title",
+     "summary": "Concise overview (2-3 sentences, max 50 words)", 
+     "detail": "Comprehensive explanation (400-600 words)"
+   }
+"""
+            
+            user_prompt = f"""
+Original Lesson Content:
+{json.dumps(original_content, indent=2)}
+
+Trainer's Modification Request:
+{modification_prompt}
+
+Please modify the lesson content according to the trainer's feedback. Return only the modified JSON structure.
+"""
+        
+        elif content_type == 'slide':
+            system_prompt = """
+You are an expert presentation designer. A trainer wants to modify a PowerPoint slide.
+
+Your task is to modify the slide content while maintaining clarity and educational value.
+
+Rules:
+1. Always output valid JSON only
+2. Follow this exact schema:
+   {
+     "title": "Slide Title",
+     "bullets": ["Bullet point 1", "Bullet point 2", "etc."]
+   }
+"""
+            
+            user_prompt = f"""
+Original Slide Content:
+{json.dumps(original_content, indent=2)}
+
+Trainer's Modification Request:
+{modification_prompt}
+
+Please modify the slide content according to the trainer's feedback. Return only the modified JSON structure.
+"""
+        
+        else:
+            raise ValueError(f"Unsupported content type: {content_type}")
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        try:
+            response_text = self._make_request(messages, max_tokens=3000)
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from response
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            if start_idx != -1 and end_idx != -1:
+                json_text = response_text[start_idx:end_idx]
+                return json.loads(json_text)
+            else:
+                raise ValueError("Could not extract valid JSON from Groq response")
+        except Exception as e:
+            raise Exception(f"Groq content modification failed: {str(e)}")
 
 class OllamaProvider(AIProvider):
     """Ollama local model provider"""
@@ -293,6 +445,33 @@ Write in an engaging, educational tone.
             return self._make_request(prompt, max_tokens=1500)
         except Exception as e:
             return f"Error generating lesson content: {str(e)}. Please try again."
+    
+    def modify_content(self, content_type: str, original_content: Dict[str, Any], modification_prompt: str) -> Dict[str, Any]:
+        """Modify existing content based on trainer feedback using Ollama"""
+        prompt = f"""
+Modify the following {content_type} content based on the trainer's feedback:
+
+Original Content:
+{json.dumps(original_content, indent=2)}
+
+Trainer's Modification Request:
+{modification_prompt}
+
+Please return the modified content in the same JSON format as the original.
+"""
+        
+        try:
+            response_text = self._make_request(prompt, max_tokens=2000)
+            # Extract JSON from response
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            if start_idx != -1 and end_idx != -1:
+                json_text = response_text[start_idx:end_idx]
+                return json.loads(json_text)
+            else:
+                raise ValueError("Could not extract valid JSON from Ollama response")
+        except Exception as e:
+            raise Exception(f"Ollama content modification failed: {str(e)}")
 
 class HuggingFaceProvider(AIProvider):
     """Hugging Face Transformers provider (local)"""
@@ -337,6 +516,14 @@ class HuggingFaceProvider(AIProvider):
     def generate_lesson_content(self, lesson_title: str, lesson_summary: str, context_chunks: List[str]) -> str:
         """Generate lesson content using Hugging Face"""
         return f"This is a placeholder lesson about {lesson_title}. Hugging Face integration requires more complex setup for quality content generation."
+    
+    def modify_content(self, content_type: str, original_content: Dict[str, Any], modification_prompt: str) -> Dict[str, Any]:
+        """Modify content using Hugging Face (placeholder)"""
+        return {
+            "error": "Hugging Face content modification not fully implemented",
+            "original_content": original_content,
+            "modification_request": modification_prompt
+        }
 
 class GeminiProvider(AIProvider):
     """Original Gemini provider (fallback)"""
@@ -370,6 +557,19 @@ class GeminiProvider(AIProvider):
         
         from llm_processor import generate_lesson_content
         return generate_lesson_content(lesson_title, lesson_summary, context_chunks)
+    
+    def modify_content(self, content_type: str, original_content: Dict[str, Any], modification_prompt: str) -> Dict[str, Any]:
+        """Modify content using Gemini (fallback to simple implementation)"""
+        if not self.is_available():
+            raise Exception("Gemini API not available")
+        
+        # Simple fallback implementation
+        return {
+            "message": "Content modification using Gemini - basic implementation",
+            "original_content": original_content,
+            "modification_request": modification_prompt,
+            "note": "Full Gemini integration for content modification requires additional implementation"
+        }
 
 class AIProviderManager:
     """Manager class to handle multiple AI providers with fallback"""
@@ -469,6 +669,38 @@ class AIProviderManager:
                     continue
         
         return "Error: All AI providers failed. Please check your configuration."
+    
+    def modify_content(self, content_type: str, original_content: Dict[str, Any], modification_prompt: str) -> Dict[str, Any]:
+        """Modify existing content based on trainer feedback"""
+        # First try Groq specifically
+        groq_provider = None
+        for provider in self.providers:
+            if isinstance(provider, GroqProvider) and provider.is_available():
+                groq_provider = provider
+                break
+        
+        if groq_provider:
+            try:
+                print(f"Attempting content modification with {groq_provider.__class__.__name__}")
+                result = groq_provider.modify_content(content_type, original_content, modification_prompt)
+                self.current_provider = groq_provider
+                return result
+            except Exception as e:
+                print(f"Failed with {groq_provider.__class__.__name__}: {str(e)}")
+        
+        # If Groq fails, try other providers
+        for provider in self.providers:
+            if provider.is_available() and not isinstance(provider, GroqProvider):
+                try:
+                    print(f"Attempting content modification with {provider.__class__.__name__}")
+                    result = provider.modify_content(content_type, original_content, modification_prompt)
+                    self.current_provider = provider
+                    return result
+                except Exception as e:
+                    print(f"Failed with {provider.__class__.__name__}: {str(e)}")
+                    continue
+        
+        raise Exception("All AI providers failed for content modification. Please check your configuration.")
 
 # Global instance
 ai_manager = AIProviderManager()

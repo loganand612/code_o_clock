@@ -4,11 +4,12 @@ import CourseDescription from './CourseDescription';
 import CourseUpload from './CourseUpload';
 import CourseDetails from './CourseDetails';
 import LearningPath from './LearningPath';
+import Examine from './Examine';
 import CourseOutcome from './CourseOutcome';
 import PDFOutcome from './PDFOutcome';
 import { CourseData } from '../types';
 
-const steps = ['Course', 'Upload', 'Learner', 'Learning Path', 'Outcome'];
+const steps = ['Course', 'Upload', 'Learner', 'Learning Path', 'Examine', 'Outcome'];
 
 export default function CourseStepper() {
   const [activeStep, setActiveStep] = useState(0);
@@ -30,9 +31,9 @@ export default function CourseStepper() {
   });
 
   const handleNext = () => {
-    // Skip Learning Path step for PowerPoint and PDF exports
+    // Skip Learning Path and Examine steps for PowerPoint and PDF exports
     if (activeStep === 2 && (courseData.exportType === 'PowerPoint' || courseData.exportType === 'PDF')) {
-      setActiveStep(3); // Jump directly to outcome step (step 3 in the 4-step flow)
+      setActiveStep(5); // Jump directly to outcome step (step 5 in the 6-step flow)
     } else {
       setActiveStep((prevStep) => prevStep + 1);
     }
@@ -40,7 +41,7 @@ export default function CourseStepper() {
 
   const handleBack = () => {
     // Handle back navigation for PowerPoint and PDF exports
-    if (activeStep === 3 && (courseData.exportType === 'PowerPoint' || courseData.exportType === 'PDF')) {
+    if (activeStep === 5 && (courseData.exportType === 'PowerPoint' || courseData.exportType === 'PDF')) {
       setActiveStep(2); // Go back to Course Details step
     } else {
       setActiveStep((prevStep) => prevStep - 1);
@@ -52,7 +53,7 @@ export default function CourseStepper() {
     if (courseData.exportType === 'PowerPoint' || courseData.exportType === 'PDF') {
       return ['Course', 'Upload', 'Learner', 'Outcome'];
     }
-    return ['Course', 'Upload', 'Learner', 'Learning Path', 'Outcome'];
+    return ['Course', 'Upload', 'Learner', 'Learning Path', 'Examine', 'Outcome'];
   };
 
   const getStepContent = (step: number) => {
@@ -98,7 +99,7 @@ export default function CourseStepper() {
           return 'Unknown step';
       }
     } else {
-      // 5-step flow: Course, Upload, Learner, Learning Path, Outcome
+      // 6-step flow: Course, Upload, Learner, Learning Path, Examine, Outcome
       switch (step) {
         case 0:
           return <CourseDescription 
@@ -128,6 +129,13 @@ export default function CourseStepper() {
                    setCourseData={setCourseData} 
                  />;
         case 4:
+          return <Examine 
+                   onNext={handleNext} 
+                   onBack={handleBack}
+                   courseData={courseData} 
+                   setCourseData={setCourseData} 
+                 />;
+        case 5:
           return <CourseOutcome 
                    onBack={handleBack}
                    courseData={courseData} 

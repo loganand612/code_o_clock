@@ -368,7 +368,7 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
           color="primary"
           onClick={onNext}
         >
-          Complete Course
+          Next Page
         </Button>
       </Box>
 

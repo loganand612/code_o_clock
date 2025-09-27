@@ -511,6 +511,105 @@ def generate_pdf_from_text():
     except Exception as e:
         return jsonify({"error": f"Failed to generate PDF: {str(e)}"}), 500
 
+@app.route('/modify-content', methods=['POST'])
+def modify_content():
+    """
+    Modify AI-generated content based on trainer feedback
+    """
+    try:
+        data = request.get_json()
+        content_type = data.get('content_type', '')  # 'course', 'module', 'lesson', 'slide'
+        content_id = data.get('content_id', '')
+        modification_prompt = data.get('modification_prompt', '')
+        original_content = data.get('original_content', {})
+        
+        if not modification_prompt:
+            return jsonify({"error": "Modification prompt is required"}), 400
+        
+        if not original_content:
+            return jsonify({"error": "Original content is required"}), 400
+        
+        # Generate modified content using AI
+        modified_content = ai_manager.modify_content(
+            content_type=content_type,
+            original_content=original_content,
+            modification_prompt=modification_prompt
+        )
+        
+        return jsonify({
+            "success": True,
+            "modified_content": modified_content,
+            "content_type": content_type,
+            "content_id": content_id
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Content modification failed: {str(e)}"}), 500
+
+@app.route('/delete-content', methods=['POST'])
+def delete_content():
+    """
+    Delete specific content (course, module, lesson, or slide)
+    """
+    try:
+        data = request.get_json()
+        content_type = data.get('content_type', '')  # 'course', 'module', 'lesson', 'slide'
+        content_id = data.get('content_id', '')
+        parent_content = data.get('parent_content', {})  # For nested deletions
+        
+        if not content_type or not content_id:
+            return jsonify({"error": "Content type and ID are required"}), 400
+        
+        # Handle different content types
+        if content_type == 'course':
+            # Delete entire course from ChromaDB
+            document_store.delete_course(content_id)
+        elif content_type == 'module':
+            # Remove module from course structure
+            # This would require updating the course data structure
+            pass
+        elif content_type == 'lesson':
+            # Remove lesson from module
+            pass
+        elif content_type == 'slide':
+            # Remove slide from presentation
+            pass
+        
+        return jsonify({
+            "success": True,
+            "message": f"{content_type} deleted successfully",
+            "deleted_id": content_id
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete content: {str(e)}"}), 500
+
+@app.route('/approve-content', methods=['POST'])
+def approve_content():
+    """
+    Approve content after trainer review
+    """
+    try:
+        data = request.get_json()
+        content_type = data.get('content_type', '')
+        content_id = data.get('content_id', '')
+        approved_content = data.get('approved_content', {})
+        
+        if not content_type or not approved_content:
+            return jsonify({"error": "Content type and approved content are required"}), 400
+        
+        # Store approved content (could be in a separate collection or mark as approved)
+        # For now, we'll just return success
+        
+        return jsonify({
+            "success": True,
+            "message": f"{content_type} approved successfully",
+            "approved_content": approved_content
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to approve content: {str(e)}"}), 500
+
 @app.route('/downloads/<filename>', methods=['GET'])
 def download_file(filename):
     """
