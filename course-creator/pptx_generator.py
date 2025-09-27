@@ -343,3 +343,4 @@ class PowerPointGenerator:
 
 # Global instance
 pptx_generator = PowerPointGenerator()
+
