@@ -45,6 +45,7 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
   const [currentQuizModule, setCurrentQuizModule] = useState<Module | null>(null);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [completedModules, setCompletedModules] = useState<Set<number>>(new Set());
 
   const course = courseData.generatedCourse;
 
@@ -71,6 +72,15 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
       newExpanded.add(moduleIndex);
     }
     setExpandedModules(newExpanded);
+  };
+
+  const handleQuizComplete = () => {
+    if (currentQuizModule) {
+      const moduleIndex = course.modules.findIndex(m => m.title === currentQuizModule.title);
+      if (moduleIndex !== -1) {
+        setCompletedModules(prev => new Set(Array.from(prev).concat(moduleIndex)));
+      }
+    }
   };
 
   const handleLessonClick = async (lesson: Lesson) => {
@@ -111,8 +121,15 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
   };
 
   const getModuleStatus = (moduleIndex: number) => {
+    // First and second modules are always accessible
     if (moduleIndex === 0) return 'active';
-    if (moduleIndex < 2) return 'unlocked';
+    if (moduleIndex === 1) return 'unlocked';
+    
+    // For modules 2 and beyond, unlock if the previous module has been completed
+    if (moduleIndex >= 2 && completedModules.has(moduleIndex - 1)) {
+      return 'unlocked';
+    }
+    
     return 'locked';
   };
 
@@ -371,6 +388,7 @@ export default function LearningPath({ onNext, onBack, courseData, setCourseData
         }}
         quiz={currentQuiz}
         moduleTitle={currentQuizModule?.title || 'Module'}
+        onQuizComplete={handleQuizComplete}
       />
 
       {/* Loading overlay for quiz generation */}

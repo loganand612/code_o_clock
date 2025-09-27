@@ -35,6 +35,7 @@ interface QuizModalProps {
   onClose: () => void;
   quiz: Quiz | null;
   moduleTitle: string;
+  onQuizComplete?: () => void;
 }
 
 interface QuizResult {
@@ -44,7 +45,7 @@ interface QuizResult {
   timeSpent: number;
 }
 
-export default function QuizModal({ open, onClose, quiz, moduleTitle }: QuizModalProps) {
+export default function QuizModal({ open, onClose, quiz, moduleTitle, onQuizComplete }: QuizModalProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<{ [questionId: number]: number }>({});
   const [showResults, setShowResults] = useState(false);
@@ -115,6 +116,11 @@ export default function QuizModal({ open, onClose, quiz, moduleTitle }: QuizModa
     const finalTime = Math.floor((Date.now() - startTime) / 1000);
     setTimeSpent(finalTime);
     setShowResults(true);
+    
+    // Call the completion callback when quiz is finished
+    if (onQuizComplete) {
+      onQuizComplete();
+    }
   };
 
   const calculateScore = (): QuizResult => {
