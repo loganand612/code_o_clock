@@ -6,9 +6,12 @@ import {
   Typography,
   Paper,
   MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 
-import { CourseStepProps } from '../types';
+import { CourseStepProps, exportTypes, ExportType } from '../types';
 
 interface CourseDetailsProps extends CourseStepProps {
   onNext: () => void; // Make onNext required for this component
@@ -49,6 +52,13 @@ export default function CourseDetails({
         ...courseData.courseDetails,
         [field]: event.target.value
       }
+    });
+  };
+
+  const handleExportTypeChange = (event: any) => {
+    setCourseData({
+      ...courseData,
+      exportType: event.target.value as ExportType
     });
   };
 
@@ -136,6 +146,21 @@ export default function CourseDetails({
           fullWidth
           helperText={`${courseData.courseDetails.targetAudience.length}/500`}
         />
+
+        <FormControl fullWidth required>
+          <InputLabel>Export Type</InputLabel>
+          <Select
+            value={courseData.exportType || 'Course'}
+            onChange={handleExportTypeChange}
+            label="Export Type"
+          >
+            {exportTypes.map((type) => (
+              <MenuItem key={type} value={type}>
+                {type}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
@@ -152,7 +177,8 @@ export default function CourseDetails({
           onClick={onNext}
           disabled={!isFormValid()}
         >
-          Generate Course
+          {courseData.exportType === 'PowerPoint' ? 'Generate PowerPoint' : 
+           courseData.exportType === 'PDF' ? 'Generate PDF' : 'Generate Course'}
         </Button>
       </Box>
     </Paper>

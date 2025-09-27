@@ -30,8 +30,15 @@ export const languages = [
   'Japanese'
 ] as const;
 
+export const exportTypes = [
+  'Course',
+  'PowerPoint',
+  'PDF'
+] as const;
+
 export type DifficultyLevel = typeof difficultyLevels[number];
 export type Language = typeof languages[number];
+export type ExportType = typeof exportTypes[number];
 
 export interface CourseDetails {
   title: string;
@@ -49,6 +56,7 @@ export interface CourseData {
   extractedText: string;
   generatedCourse: GeneratedCourse | null;
   courseDetails: CourseDetails;
+  exportType: ExportType;
 }
 
 export interface CourseStepProps {

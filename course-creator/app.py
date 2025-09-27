@@ -13,6 +13,8 @@ from chroma_storage import ChromaDocumentStore
 from translation_service import translation_service
 from quiz_generator import quiz_generator
 from tts_service import tts_service
+from pptx_generator import pptx_generator
+from pdf_generator import pdf_generator
 
 app = Flask(__name__)
 CORS(app)
@@ -410,6 +412,132 @@ def get_tts_languages():
         })
     except Exception as e:
         return jsonify({"error": f"Failed to get TTS languages: {str(e)}"}), 500
+
+@app.route('/generate-pptx', methods=['POST'])
+def generate_pptx():
+    """
+    Generate PowerPoint presentation from course data
+    """
+    try:
+        data = request.get_json()
+        course_data = data.get('courseData')
+        
+        if not course_data:
+            return jsonify({"error": "No course data provided"}), 400
+        
+        # Generate PowerPoint from course data
+        filename = pptx_generator.generate_from_course(course_data)
+        
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "download_url": f"/downloads/{filename}"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate PowerPoint: {str(e)}"}), 500
+
+@app.route('/generate-pptx-from-text', methods=['POST'])
+def generate_pptx_from_text():
+    """
+    Generate PowerPoint presentation from raw text
+    """
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        title = data.get('title', 'Generated Presentation')
+        
+        if not text:
+            return jsonify({"error": "No text provided"}), 400
+        
+        # Generate PowerPoint from text
+        filename = pptx_generator.generate_from_text(text, title)
+        
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "download_url": f"/downloads/{filename}"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate PowerPoint: {str(e)}"}), 500
+
+@app.route('/generate-pdf', methods=['POST'])
+def generate_pdf():
+    """
+    Generate PDF document from course data
+    """
+    try:
+        data = request.get_json()
+        course_data = data.get('courseData')
+        
+        if not course_data:
+            return jsonify({"error": "No course data provided"}), 400
+        
+        # Generate PDF from course data
+        filename = pdf_generator.generate_from_course(course_data)
+        
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "download_url": f"/downloads/{filename}"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate PDF: {str(e)}"}), 500
+
+@app.route('/generate-pdf-from-text', methods=['POST'])
+def generate_pdf_from_text():
+    """
+    Generate PDF document from raw text
+    """
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        title = data.get('title', 'Generated Document')
+        
+        if not text:
+            return jsonify({"error": "No text provided"}), 400
+        
+        # Generate PDF from text
+        filename = pdf_generator.generate_from_text(text, title)
+        
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "download_url": f"/downloads/{filename}"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate PDF: {str(e)}"}), 500
+
+@app.route('/downloads/<filename>', methods=['GET'])
+def download_file(filename):
+    """
+    Serve generated files for download (PowerPoint, PDF, etc.)
+    """
+    try:
+        from flask import send_from_directory
+        
+        # Determine file type based on extension
+        if filename.endswith('.pptx'):
+            mimetype = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+            directory = pptx_generator.download_folder
+        elif filename.endswith('.pdf'):
+            mimetype = 'application/pdf'
+            directory = pdf_generator.download_folder
+        else:
+            mimetype = 'application/octet-stream'
+            directory = 'downloads'
+        
+        return send_from_directory(
+            directory=directory,
+            path=filename,
+            as_attachment=True,
+            mimetype=mimetype
+        )
+    except Exception as e:
+        return jsonify({"error": f"File not found: {str(e)}"}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)
