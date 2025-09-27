@@ -12,6 +12,7 @@ from ai_providers import ai_manager
 from chroma_storage import ChromaDocumentStore
 from translation_service import translation_service
 from quiz_generator import quiz_generator
+from tts_service import tts_service
 
 app = Flask(__name__)
 CORS(app)
@@ -337,6 +338,78 @@ def generate_module_quiz():
         
     except Exception as e:
         return jsonify({"error": f"Module quiz generation failed: {str(e)}"}), 500
+
+@app.route('/text-to-speech', methods=['POST'])
+def text_to_speech():
+    """
+    Convert text to speech and return audio as base64 encoded string
+    """
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        language = data.get('language', 'en')
+        
+        if not text or not text.strip():
+            return jsonify({"error": "Text is required"}), 400
+        
+        # Convert text to speech
+        audio_base64 = tts_service.text_to_speech_base64(text, language)
+        
+        if audio_base64 is None:
+            return jsonify({"error": "Failed to convert text to speech"}), 500
+        
+        return jsonify({
+            "audio_base64": audio_base64,
+            "text_length": len(text),
+            "language": language,
+            "format": "mp3"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Text-to-speech conversion failed: {str(e)}"}), 500
+
+@app.route('/lesson-speech', methods=['POST'])
+def lesson_speech():
+    """
+    Convert lesson content to speech, optimized for lesson formatting
+    """
+    try:
+        data = request.get_json()
+        content = data.get('content', '')
+        language = data.get('language', 'en')
+        
+        if not content or not content.strip():
+            return jsonify({"error": "Content is required"}), 400
+        
+        # Convert lesson content to speech
+        audio_base64 = tts_service.convert_lesson_content_to_speech(content, language)
+        
+        if audio_base64 is None:
+            return jsonify({"error": "Failed to convert lesson content to speech"}), 500
+        
+        return jsonify({
+            "audio_base64": audio_base64,
+            "content_length": len(content),
+            "language": language,
+            "format": "mp3"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Lesson speech conversion failed: {str(e)}"}), 500
+
+@app.route('/tts-languages', methods=['GET'])
+def get_tts_languages():
+    """
+    Get list of supported languages for text-to-speech
+    """
+    try:
+        languages = tts_service.get_supported_languages()
+        return jsonify({
+            "languages": languages,
+            "default_language": "en"
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to get TTS languages: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

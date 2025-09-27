@@ -23,7 +23,9 @@ import {
   Schedule,
   CheckCircle,
   Translate,
-  Language
+  Language,
+  VolumeUp,
+  Stop
 } from '@mui/icons-material';
 import { Lesson, TranslationState, TranslationResponse } from '../types';
 import axios from 'axios';
@@ -42,12 +44,20 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
   const [error, setError] = useState<string | null>(null);
   
   // Translation state
-  const [translationState, setTranslationState] = useState<TranslationState>({
+  const [translationState, setTranslationState] = useState({
     isTranslated: false,
     currentLanguage: 'en',
     targetLanguage: 'ta',
     isLoading: false,
     error: null
+  });
+
+  const [speechState, setSpeechState] = useState({
+    isPlaying: false,
+    isLoading: false,
+    error: null as string | null,
+    audioData: null as string | null,
+    audioElement: null as HTMLAudioElement | null
   });
   
   const [availableLanguages] = useState([
@@ -150,6 +160,19 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
   };
 
   const handleClose = () => {
+    // Stop any playing audio
+    if (speechState.audioElement) {
+      speechState.audioElement.pause();
+      speechState.audioElement.currentTime = 0;
+    }
+    setSpeechState({
+      isPlaying: false,
+      isLoading: false,
+      error: null,
+      audioData: null,
+      audioElement: null
+    });
+    
     setLessonContent('');
     setOriginalContent('');
     setError(null);
@@ -161,6 +184,88 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
       error: null
     });
     onClose();
+  };
+
+  const handleListen = async () => {
+    try {
+      setSpeechState(prev => ({ ...prev, isLoading: true, error: null }));
+      
+      const currentContent = translationState.isTranslated ? originalContent : lessonContent;
+      const currentLanguage = translationState.isTranslated ? translationState.currentLanguage : 'en';
+      
+      if (!currentContent) {
+        setSpeechState(prev => ({ ...prev, isLoading: false, error: 'No content available for speech' }));
+        return;
+      }
+
+      // If we already have audio data and it's for the same content, just play/pause
+      if (speechState.audioData && speechState.audioElement) {
+        if (speechState.isPlaying) {
+          speechState.audioElement.pause();
+          setSpeechState(prev => ({ ...prev, isPlaying: false }));
+        } else {
+          speechState.audioElement.play();
+          setSpeechState(prev => ({ ...prev, isPlaying: true }));
+        }
+        return;
+      }
+
+      // Generate new speech
+      const response = await fetch('http://localhost:5000/lesson-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: currentContent,
+          language: currentLanguage
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate speech');
+      }
+
+      const data = await response.json();
+      
+      // Create audio element from base64 data
+      const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
+      
+      audio.onended = () => {
+        setSpeechState(prev => ({ ...prev, isPlaying: false }));
+      };
+      
+      audio.onerror = () => {
+        setSpeechState(prev => ({ ...prev, isPlaying: false, error: 'Failed to play audio' }));
+      };
+      
+      setSpeechState(prev => ({ 
+        ...prev, 
+        audioData: data.audio_base64,
+        audioElement: audio
+      }));
+      
+      // Start playing
+      await audio.play();
+      setSpeechState(prev => ({ ...prev, isPlaying: true, isLoading: false }));
+      
+    } catch (error) {
+      console.error('Text-to-speech error:', error);
+      setSpeechState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        error: error instanceof Error ? error.message : 'Failed to generate speech'
+      }));
+    }
+  };
+
+  const stopSpeech = () => {
+    if (speechState.audioElement) {
+      speechState.audioElement.pause();
+      speechState.audioElement.currentTime = 0;
+      setSpeechState(prev => ({ ...prev, isPlaying: false }));
+    }
   };
 
   if (!lesson) return null;
@@ -225,6 +330,27 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
                 >
                   {translationState.isLoading ? 'Translating...' : 
                    translationState.isTranslated ? 'English' : 'Translate'}
+                </Button>
+              </Tooltip>
+              
+              {/* Listen Button */}
+              <Tooltip title={speechState.isPlaying ? "Stop listening" : "Listen to lesson content"}>
+                <Button
+                  variant={speechState.isPlaying ? "contained" : "outlined"}
+                  color="secondary"
+                  size="small"
+                  onClick={speechState.isPlaying ? stopSpeech : handleListen}
+                  disabled={speechState.isLoading || !lessonContent}
+                  startIcon={speechState.isLoading ? <CircularProgress size={16} /> : 
+                           speechState.isPlaying ? <Stop /> : <VolumeUp />}
+                  sx={{ 
+                    minWidth: 'auto',
+                    px: 2,
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {speechState.isLoading ? 'Loading...' : 
+                   speechState.isPlaying ? 'Stop' : 'Listen'}
                 </Button>
               </Tooltip>
             </Box>
@@ -311,6 +437,12 @@ export default function LessonModal({ open, onClose, lesson, courseId }: LessonM
           {translationState.error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               Translation Error: {translationState.error}
+            </Alert>
+          )}
+
+          {speechState.error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Speech Error: {speechState.error}
             </Alert>
           )}
 
